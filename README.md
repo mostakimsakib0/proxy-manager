@@ -1,31 +1,33 @@
 # Proxy Manager
 
-GTK-based GUI tool to manage system proxy on Linux.
+A simple GTK-based GUI tool to manage system proxy on Linux (APT, Git, environment).
 
 ## Screenshot
 
 ![Proxy Manager UI](screenshot.png)
 
 ## Features
+
 - Enable / Disable proxy
 - Session mode (no sudo)
-- System mode (APT + Git support)
+- System-wide proxy (APT + Git)
 - Proxy test (real IP detection)
 - Notifications
 - Saved profiles
 - Restart apps option
 
-## Install
+## Installation
 
-Download `.deb` and install:
+Download `.deb` from Releases and install:
 
 sudo dpkg -i proxy-manager.deb
 
-## Run
+## Usage
 
-Search "Proxy Manager" in your system menu
+Launch from application menu:
+"Proxy Manager"
 
 ## Notes
 
 - Session mode does NOT affect APT
-- Proxy must be running (e.g. 127.0.0.1:8080)
+- Proxy must be running 
