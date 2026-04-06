@@ -110,4 +110,4 @@ This project is open-source and available under the MIT License.
 
 ## Author
 
-Developed by # Mostakim Sakib
+Developed by ## Mostakim Sakib
