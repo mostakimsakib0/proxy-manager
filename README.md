@@ -6,7 +6,7 @@ A GTK-based GUI tool to manage system proxy settings on Linux (APT, Git, and env
 
 ## Screenshot
 
-![Proxy Manager UI](Screenshot.png)
+![Proxy Manager UI](screenshot.png)
 
 ---
 
@@ -113,23 +113,5 @@ This project is open-source and available under the MIT License.
 Developed by Mostakim Sakib
 
 ````
-
----
-
-# 🧠 Why this is actually “professional”
-
-- clear structure ✔  
-- proper sections ✔  
-- handles edge cases ✔  
-- doesn’t assume user is you ✔  
-- explains limitations (this is big) ✔  
-
----
-
-# ⚠️ One last thing (don’t skip)
-
-Make sure your repo has:
-
-```text
 screenshot.png
 ````
