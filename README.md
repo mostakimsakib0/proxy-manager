@@ -4,7 +4,7 @@ GTK-based GUI tool to manage system proxy on Linux.
 
 ## Screenshot
 
-![Screenshot](screenshot.png)
+![Proxy Manager UI](screenshot.png)
 
 ## Features
 - Enable / Disable proxy
