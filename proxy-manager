@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib
+import subprocess, socket, re, os, json, time, datetime
+
+SCRIPT_PATH = "/usr/local/bin/proxy"
+PROFILE_FILE = os.path.expanduser("~/.proxy_profiles.json")
+
+
+class ProxyGUI(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Proxy Manager")
+
+        self.set_border_width(10)
+        self.set_default_size(420, 400)
+
+        settings = Gtk.Settings.get_default()
+        settings.set_property("gtk-application-prefer-dark-theme", True)
+
+        self.manual_override = False
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+
+        # Inputs
+        self.ip_entry = Gtk.Entry()
+        self.ip_entry.set_placeholder_text("IP address")
+
+        self.port_entry = Gtk.Entry()
+        self.port_entry.set_placeholder_text("Port")
+
+        # Profiles
+        self.profile_combo = Gtk.ComboBoxText()
+        self.profile_combo.connect("changed", self.load_selected_profile)
+        self.load_profiles()
+
+        btn_save = Gtk.Button(label="Save Profile")
+        btn_save.connect("clicked", self.save_profile)
+
+        # Options
+        self.session_only = Gtk.CheckButton(label="Session only (no sudo)")
+        self.restart_check = Gtk.CheckButton(label="Restart apps")
+
+        self.app_entry = Gtk.Entry()
+        self.app_entry.set_placeholder_text("Apps to restart (e.g. firefox code)")
+
+        # Buttons
+        btn_on = Gtk.Button(label="Enable")
+        btn_on.connect("clicked", self.enable_proxy)
+
+        btn_off = Gtk.Button(label="Disable")
+        btn_off.connect("clicked", self.disable_proxy)
+
+        btn_check = Gtk.Button(label="Check System")
+        btn_check.connect("clicked", self.check_system)
+
+        btn_test = Gtk.Button(label="Test Proxy (Real)")
+        btn_test.connect("clicked", self.open_test)
+
+        btn_clear = Gtk.Button(label="Clear Log")
+        btn_clear.connect("clicked", self.clear_log)
+
+        # Labels
+        self.current_label = Gtk.Label(label="Current: None")
+        self.status = Gtk.Label(label="Checking...")
+
+        # Log
+        self.log = Gtk.TextView()
+        self.log.set_editable(False)
+        self.log.set_size_request(-1, 100)
+
+        # Layout
+        for w in [
+            self.ip_entry, self.port_entry,
+            self.profile_combo, btn_save,
+            self.session_only,
+            self.restart_check, self.app_entry,
+            btn_on, btn_off, btn_check, btn_test,
+            self.current_label, self.status,
+            btn_clear, self.log
+        ]:
+            box.pack_start(w, False, False, 0)
+
+        self.add(box)
+
+        self.check_proxy_status()
+        GLib.timeout_add(2000, self.refresh_status)
+
+    # ---------------- NOTIFY ----------------
+    def notify(self, title, message):
+        subprocess.Popen(["notify-send", title, message])
+
+    # ---------------- LOG ----------------
+    def log_msg(self, msg):
+        buf = self.log.get_buffer()
+        t = datetime.datetime.now().strftime("%H:%M:%S")
+        buf.insert(buf.get_end_iter(), f"[{t}] {msg}\n")
+
+    def clear_log(self, widget):
+        self.log.get_buffer().set_text("")
+
+    # ---------------- PROFILES ----------------
+    def load_profiles(self):
+        self.profile_combo.remove_all()
+        if os.path.exists(PROFILE_FILE):
+            with open(PROFILE_FILE) as f:
+                for p in json.load(f):
+                    self.profile_combo.append_text(p)
+
+    def save_profile(self, widget):
+        ip = self.ip_entry.get_text()
+        port = self.port_entry.get_text()
+        proxy = f"{ip}:{port}"
+
+        data = []
+        if os.path.exists(PROFILE_FILE):
+            with open(PROFILE_FILE) as f:
+                data = json.load(f)
+
+        if proxy not in data:
+            data.append(proxy)
+
+        with open(PROFILE_FILE, "w") as f:
+            json.dump(data, f)
+
+        self.load_profiles()
+        self.log_msg(f"Saved profile {proxy}")
+        self.notify("Proxy", f"Saved {proxy}")
+
+    def load_selected_profile(self, widget):
+        text = self.profile_combo.get_active_text()
+        if text:
+            ip, port = text.split(":")
+            self.ip_entry.set_text(ip)
+            self.port_entry.set_text(port)
+
+    # ---------------- ENABLE ----------------
+    def enable_proxy(self, widget):
+        ip = self.ip_entry.get_text()
+        port = self.port_entry.get_text()
+
+        if not ip or not port:
+            self.status.set_text("Enter IP and Port")
+            return
+
+        proxy = f"http://{ip}:{port}"
+
+        if self.session_only.get_active():
+            os.environ["http_proxy"] = proxy
+            os.environ["https_proxy"] = proxy
+            self.status.set_text("Session Enabled (APT ignored)")
+            self.log_msg("Session proxy enabled")
+            self.notify("Proxy", "Session Enabled")
+        else:
+            r = subprocess.run(["pkexec", SCRIPT_PATH, "on", proxy])
+            if r.returncode == 0:
+                self.status.set_text("Enabled")
+                self.log_msg(f"Enabled {proxy}")
+                self.notify("Proxy", f"Enabled {proxy}")
+            else:
+                self.status.set_text("Failed")
+                self.notify("Proxy", "Enable failed")
+                return
+
+        if self.restart_check.get_active():
+            apps = self.app_entry.get_text().split()
+            for app in apps:
+                subprocess.run(["killall", app], stderr=subprocess.DEVNULL)
+            self.log_msg(f"Restarted: {' '.join(apps)}")
+
+    # ---------------- DISABLE ----------------
+    def disable_proxy(self, widget):
+        if self.session_only.get_active():
+            os.environ.pop("http_proxy", None)
+            os.environ.pop("https_proxy", None)
+            self.status.set_text("Session Disabled")
+            self.log_msg("Session proxy removed")
+            self.notify("Proxy", "Session Disabled")
+        else:
+            r = subprocess.run(["pkexec", SCRIPT_PATH, "off"])
+            if r.returncode == 0:
+                self.status.set_text("Disabled")
+                self.notify("Proxy", "Disabled")
+            else:
+                self.status.set_text("Failed")
+
+    # ---------------- STATUS ----------------
+    def check_proxy_status(self):
+        try:
+            with open("/etc/environment") as f:
+                content = f.read()
+
+            match = re.search(r'http_proxy="http://([^:]+):(\d+)"', content)
+
+            if not match:
+                self.status.set_text("Disabled")
+                self.current_label.set_text("Current: None")
+                return
+
+            ip, port = match.group(1), int(match.group(2))
+
+            self.current_label.set_text(f"Current: {ip}:{port}")
+            self.ip_entry.set_text(ip)
+            self.port_entry.set_text(str(port))
+
+            sock = socket.socket()
+            sock.settimeout(1)
+
+            start = time.time()
+            res = sock.connect_ex((ip, port))
+            latency = int((time.time() - start) * 1000)
+
+            sock.close()
+
+            if res == 0:
+                self.status.set_text(f"Running ({latency} ms)")
+            else:
+                self.status.set_text("Stopped")
+
+        except:
+            self.status.set_text("Unknown")
+
+    def refresh_status(self):
+        if not self.manual_override:
+            self.check_proxy_status()
+        return True
+
+    # ---------------- CHECK SYSTEM ----------------
+    def check_system(self, widget):
+        self.manual_override = True
+        results = []
+
+        results.append("APT:OK" if os.path.exists("/etc/apt/apt.conf.d/95proxies") else "APT:NO")
+
+        git = subprocess.run(["git","config","--global","--get","http.proxy"],
+                             capture_output=True,text=True).stdout.strip()
+        results.append("Git:OK" if git else "Git:NO")
+
+        self.status.set_text(" | ".join(results))
+        GLib.timeout_add(5000, self.reset_override)
+
+    def reset_override(self):
+        self.manual_override = False
+        return False
+
+    # ---------------- TEST ----------------
+    def open_test(self, widget):
+        ip = self.ip_entry.get_text()
+        port = self.port_entry.get_text()
+
+        if not ip or not port:
+            self.log_msg("No proxy set")
+            return
+
+        proxy = f"http://{ip}:{port}"
+
+        try:
+            result = subprocess.run(
+                ["curl", "-x", proxy, "https://ifconfig.me"],
+                capture_output=True, text=True, timeout=5
+            )
+
+            output = result.stdout.strip()
+
+            if output:
+                self.log_msg(f"✔ Proxy IP: {output}")
+                self.notify("Proxy Test", f"IP: {output}")
+            else:
+                self.log_msg("✘ Proxy failed")
+                self.notify("Proxy Test", "Failed")
+
+        except:
+            self.log_msg("✘ Test error")
+            self.notify("Proxy Test", "Error")
+
+
+win = ProxyGUI()
+win.connect("destroy", Gtk.main_quit)
+win.show_all()
+Gtk.main()
