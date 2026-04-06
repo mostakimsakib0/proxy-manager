@@ -2,6 +2,10 @@
 
 GTK-based GUI tool to manage system proxy on Linux.
 
+## Screenshot
+
+![Screenshot](screenshot.png)
+
 ## Features
 - Enable / Disable proxy
 - Session mode (no sudo)
