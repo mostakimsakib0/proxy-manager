@@ -18,8 +18,12 @@ A simple GTK-based GUI tool to manage system proxy on Linux (APT, Git, environme
 
 ## Installation
 
-Download `.deb` from Releases and install:
+### Option 1: Install via .deb package (recommended)
 
+1. Download the latest release from the [Releases](../../releases) page.
+2. Install the package:
+
+```bash
 sudo dpkg -i proxy-manager.deb
 
 ## Usage
