@@ -90,7 +90,7 @@ python3 proxy_gui.py
 ## Notes
 
 * Session mode does NOT affect APT (APT requires system-level configuration)
-* Ensure your proxy server is running (e.g. `127.0.0.1:8080`)
+* Ensure your proxy server is running
 * Some applications may require restart to apply proxy settings
 
 ---
