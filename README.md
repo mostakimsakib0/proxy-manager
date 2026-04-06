@@ -113,5 +113,3 @@ This project is open-source and available under the MIT License.
 Developed by Mostakim Sakib
 
 ````
-screenshot.png
-````
